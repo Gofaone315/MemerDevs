@@ -19,7 +19,7 @@ from datetime import datetime
 import os
 import webbrowser
 from plyer import notification
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from threading import Thread
 import pyrebase
@@ -431,10 +431,6 @@ MEDIA_DIR = "/storage/emulated/0/MemerDevs/Media"
 
 if not os.path.exists(MEDIA_DIR):
     os.makedirs(MEDIA_DIR)
-
-@app.route("/")
-def index():
-    return render_template('index.html')
     
 @app.route('/get_posts', methods=['GET'])
 def get_posts():
