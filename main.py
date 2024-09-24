@@ -891,13 +891,13 @@ class MemerDevsApp(MDApp):
         flask_thread.start()
         home_screen = self.sm.get_screen('home')
         box_layout = home_screen.ids.server_results
-        message = MDLabel(text="Running on localhost port 5000...", pos_hint={"center_x": 0.5}, bold=True)
+        message = MDLabel(text="Running on browser...", pos_hint={"center_x": 0.5}, bold=True)
         redirect_button = MDRaisedButton(text="Open Browser", pos_hint={"center_x": 0.5}, on_release=self.open_link)
         box_layout.add_widget(message)
         box_layout.add_widget(redirect_button)
         
     def open_link(self, instance):
-        webbrowser.open("http://localhost:5000")
+        webbrowser.open("https://memerdevs.web.ap")
 
 if __name__ == '__main__':
     MemerDevsApp().run()
