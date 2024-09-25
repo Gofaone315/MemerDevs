@@ -62,7 +62,7 @@ jobs:
           python3 -m pip install --upgrade \
             Cython==0.29.33 \
             buildozer \
-            distutils
+            setuptools
         shell: bash
 
       - name: Install requirements from requirements.txt
@@ -106,7 +106,7 @@ jobs:
         run: |
           brew update
           brew install git autoconf automake libtool pkg-config
-          python3 -m pip install --upgrade Cython==0.29.33 buildozer distutils
+          python3 -m pip install --upgrade Cython==0.29.33 buildozer setuptools
         shell: bash
 
       - name: Install Python dependencies
