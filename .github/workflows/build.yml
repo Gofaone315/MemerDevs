@@ -53,7 +53,8 @@ jobs:
             libtinfo5 \
             cmake \
             libffi-dev \
-            libssl-dev
+            libssl-dev \
+            aidl
           export PATH=$PATH:~/.local/bin/
         shell: bash
 
@@ -62,8 +63,7 @@ jobs:
           python3 -m pip install --upgrade \
             Cython==0.29.33 \
             buildozer \
-            setuptools \
-            Aidl
+            setuptools
         shell: bash
 
       - name: Install requirements from requirements.txt
