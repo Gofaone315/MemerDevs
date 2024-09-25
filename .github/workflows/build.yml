@@ -1,5 +1,5 @@
-name: 'Kivy App to APK'
-description: 'Convert Kivy app to APK'
+name: 'Kivy App to APK and IPA'
+description: 'Convert Kivy app to APK for Android and IPA for iOS'
 inputs:
   python-version:
     description: 'Python version to use'
@@ -7,74 +7,133 @@ inputs:
   workdir:
     default: '.'
     description: 'Working directory'
-  buildozer-cmd:
+  buildozer-cmd-android:
     default: 'buildozer android debug'
-    description: 'Buildozer command to use'
+    description: 'Buildozer command to use for Android'
+  buildozer-cmd-ios:
+    default: 'buildozer ios debug'
+    description: 'Buildozer command to use for iOS'
 
 # Add the branding section
 branding:
   color: 'green'
   icon: 'play'
 
-runs:
-  using: "composite"
-  steps:
-    - name: Setup python
-      uses: actions/setup-python@v5
-      with:
-        architecture: x64
-        python-version: ${{ inputs.python-version }}
-
-    - name: Setup Java 17 required by Gradle
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'  # or 'zulu','liberica', etc.
-        java-version: '17'
-
-    - name: Set JAVA_HOME
-      run: |
-        echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
-      shell: bash
-
-    - name: Prepare virtual environment
-      run: |
-        python3 -m venv venv
-        source venv/bin/activate
-        echo "Using Python==$(python --version)"
-      shell: bash
+jobs:
+  android:
+    name: Build APK for Android
+    runs-on: ubuntu-latest  # Use Ubuntu for Android builds
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
       
-    - name: Install and upgrade dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y git \
-          zip \
-          unzip \
-          openjdk-17-jdk \
-          python3-pip \
-          autoconf \
-          libtool \
-          pkg-config \
-          zlib1g-dev \
-          libncurses5-dev \
-          libncursesw5-dev \
-          libtinfo5 \
-          cmake \
-          libffi-dev \
-          libssl-dev
-        export PATH=$PATH:~/.local/bin/
-        python3 -m pip install --upgrade \
-          Cython==0.29.33 \
-          buildozer
-      shell: bash
+      - name: Setup python
+        uses: actions/setup-python@v5
+        with:
+          architecture: x64
+          python-version: ${{ inputs.python-version }}
 
-    - name: Install requirements in requirements.txt if it exists
-      run: |
-        if [ -f requirements.txt ]; then
-          python3 -m pip install -r requirements.txt
-        fi
-      shell: bash
+      - name: Setup Java 17 required by Gradle
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-    - name: Build with Buildozer
-      run: |
-        ${{ inputs.buildozer-cmd }}
-      shell: bash
+      - name: Prepare virtual environment
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          echo "Using Python==$(python --version)"
+        shell: bash
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y git \
+            zip \
+            unzip \
+            openjdk-17-jdk \
+            python3-pip \
+            autoconf \
+            libtool \
+            pkg-config \
+            zlib1g-dev \
+            libncurses5-dev \
+            libncursesw5-dev \
+            libtinfo5 \
+            cmake \
+            libffi-dev \
+            libssl-dev
+          export PATH=$PATH:~/.local/bin/
+        shell: bash
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade \
+            Cython==0.29.33 \
+            buildozer
+        shell: bash
+
+      - name: Install requirements from requirements.txt
+        run: |
+          if [ -f requirements.txt ]; then
+            python3 -m pip install -r requirements.txt
+          fi
+        shell: bash
+
+      - name: Build APK with Buildozer
+        run: |
+          ${{ inputs.buildozer-cmd-android }}
+        shell: bash
+
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: android-apk
+          path: |
+            ./bin/*.apk  # This is where Buildozer usually stores the APK file
+
+  ios:
+    name: Build IPA for iOS
+    runs-on: macos-latest  # Use macOS for iOS builds
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Prepare virtual environment
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          echo "Using Python==$(python --version)"
+        shell: bash
+
+      - name: Install system dependencies
+        run: |
+          brew update
+          brew install git autoconf automake libtool pkg-config
+          python3 -m pip install --upgrade Cython==0.29.33 buildozer
+        shell: bash
+
+      - name: Install Python dependencies
+        run: |
+          if [ -f requirements.txt ]; then
+            python3 -m pip install -r requirements.txt
+          fi
+        shell: bash
+
+      - name: Build IPA with Buildozer
+        run: |
+          ${{ inputs.buildozer-cmd-ios }}
+        shell: bash
+
+      - name: Upload IPA as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ios-ipa
+          path: |
+            ./bin/ios/*/  # This is where Buildozer usually stores the IPA file
