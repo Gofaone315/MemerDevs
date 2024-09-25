@@ -32,13 +32,19 @@ jobs:
     - name: Build Executable
       run: |
         if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
-          python -m nuitka --standalone --onefile --output-dir=dist main.py
+          python -m nuitka --standalone --static-libpython=yes --onefile --output-dir=dist main.py
         elif [ "${{ matrix.os }}" == "windows-latest" ]; then
-          python -m nuitka --standalone --onefile --windows-icon-from-ico=logo.ico --windows-company-name="Gofaone Tlalang" --windows-product-name="MemerDevs" --output-dir=dist main.py
+          python -m nuitka --standalone --onefile \
+            --windows-icon-from-ico=logo.ico \
+            --windows-company-name="Gofaone Tlalang" \
+            --windows-product-name="MemerDevs" \
+            --file-version="1.0.0.0" \            
+            --product-version="1.0.0.0" \          
+            --output-dir=dist main.py
         elif [ "${{ matrix.os }}" == "macos-latest" ]; then
-          python -m nuitka --standalone --onefile --output-dir=dist main.py
+          python -m nuitka --standalone --static-libpython=yes --onefile --output-dir=dist main.py
         fi
-      shell: bash  # Use bash shell for consistency
+      shell: bash
 
     - name: Archive Artifacts
       if: success()
