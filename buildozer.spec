@@ -44,7 +44,7 @@ requirements = python3,kivy,plyer,kivymd,pyrebase4,flask,flask-cors
 # requirements.source.kivy = ../../kivy
 
 # (str) Presplash of the application
-#presplash.filename = %(source.dir)s/data/presplash.png
+presplash.filename = %(source.dir)s/logo.ico
 
 # (str) Icon of the application
 icon.filename = %(source.dir)s/logo.ico
@@ -61,10 +61,10 @@ orientation = portrait
 #
 
 #
-# author = Gofaone Tlalang
+author = Gofaone Tlalang
 
 # change the major version of python used by the app
-osx.python_version = 3
+osx.python_version = 3.12
 
 # Kivy version to use
 osx.kivy_version = 2.2.1
@@ -95,7 +95,7 @@ fullscreen = 0
 
 # (list) Permissions
 # (See https://python-for-android.readthedocs.io/en/latest/buildoptions/#build-options-1 for all the supported syntaxes and properties)
-android.permissions = android.permission.INTERNET, (name=android.permission.WRITE_EXTERNAL_STORAGE;maxSdkVersion=18), (name=android.permission.READ_EXTERNAL_STORAGE;maxSdkVersion=18)
+android.permissions = android.permission.INTERNET, android.permission.WRITE_EXTERNAL_STORAGE, android.permission.READ_EXTERNAL_STORAGE
 
 # (list) features (adds uses-feature -tags to manifest)
 #android.features = android.hardware.usb.host
