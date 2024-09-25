@@ -24,7 +24,7 @@ jobs:
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install kivy kivymd flask flask-cors pyrebase
+        pip install kivy kivymd flask flask-cors pyrebase4 plyer
 
     - name: Install Nuitka
       run: python -m pip install nuitka
