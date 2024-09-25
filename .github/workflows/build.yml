@@ -1,23 +1,14 @@
 name: 'Kivy App to APK and IPA'
-description: 'Convert Kivy app to APK for Android and IPA for iOS'
-inputs:
-  python-version:
-    description: 'Python version to use'
-    default: '3.12'
-  workdir:
-    default: '.'
-    description: 'Working directory'
-  buildozer-cmd-android:
-    default: 'buildozer android debug'
-    description: 'Buildozer command to use for Android'
-  buildozer-cmd-ios:
-    default: 'buildozer ios debug'
-    description: 'Buildozer command to use for iOS'
 
-# Add the branding section
-branding:
-  color: 'green'
-  icon: 'play'
+# Define the event that triggers the workflow
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:  # Allows manual triggering
 
 jobs:
   android:
@@ -30,8 +21,7 @@ jobs:
       - name: Setup python
         uses: actions/setup-python@v5
         with:
-          architecture: x64
-          python-version: ${{ inputs.python-version }}
+          python-version: '3.12'
 
       - name: Setup Java 17 required by Gradle
         uses: actions/setup-java@v4
@@ -83,15 +73,14 @@ jobs:
 
       - name: Build APK with Buildozer
         run: |
-          ${{ inputs.buildozer-cmd-android }}
+          buildozer android debug
         shell: bash
 
       - name: Upload APK as artifact
         uses: actions/upload-artifact@v3
         with:
           name: android-apk
-          path: |
-            ./bin/*.apk  # This is where Buildozer usually stores the APK file
+          path: ./bin/*.apk  # This is where Buildozer usually stores the APK file
 
   ios:
     name: Build IPA for iOS
@@ -103,7 +92,7 @@ jobs:
       - name: Setup python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ inputs.python-version }}
+          python-version: '3.12'
 
       - name: Prepare virtual environment
         run: |
@@ -128,12 +117,11 @@ jobs:
 
       - name: Build IPA with Buildozer
         run: |
-          ${{ inputs.buildozer-cmd-ios }}
+          buildozer ios debug
         shell: bash
 
       - name: Upload IPA as artifact
         uses: actions/upload-artifact@v3
         with:
           name: ios-ipa
-          path: |
-            ./bin/ios/*/  # This is where Buildozer usually stores the IPA file
+          path: ./bin/ios/*/  # This is where Buildozer usually stores the IPA file
