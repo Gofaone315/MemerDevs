@@ -53,8 +53,7 @@ jobs:
             libtinfo5 \
             cmake \
             libffi-dev \
-            libssl-dev \
-            aidl
+            libssl-dev
           export PATH=$PATH:~/.local/bin/
         shell: bash
 
@@ -78,11 +77,21 @@ jobs:
           buildozer android debug
         shell: bash
 
-      - name: Upload APK as artifact
+      - name: Clean up intermediate build files
+        run: |
+          buildozer android clean
+        shell: bash
+
+      - name: Compress APK
+        run: |
+          zip -r android-apk.zip ./bin/*.apk
+        shell: bash
+
+      - name: Upload compressed APK as artifact
         uses: actions/upload-artifact@v3
         with:
           name: android-apk
-          path: ./bin/*.apk  # This is where Buildozer usually stores the APK file
+          path: android-apk.zip
 
   ios:
     name: Build IPA for iOS
@@ -107,7 +116,7 @@ jobs:
         run: |
           brew update
           brew install git autoconf automake libtool pkg-config
-          python3 -m pip install --upgrade Cython==0.29.33 buildozer setuptools pbxproj
+          python3 -m pip install --upgrade Cython==0.29.33 buildozer pbxproj setuptools
         shell: bash
 
       - name: Install Python dependencies
@@ -122,8 +131,18 @@ jobs:
           buildozer ios debug
         shell: bash
 
-      - name: Upload IPA as artifact
+      - name: Clean up intermediate build files
+        run: |
+          buildozer ios clean
+        shell: bash
+
+      - name: Compress IPA
+        run: |
+          zip -r ios-ipa.zip ./bin/ios/*
+        shell: bash
+
+      - name: Upload compressed IPA as artifact
         uses: actions/upload-artifact@v3
         with:
           name: ios-ipa
-          path: ./bin/ios/*/  # This is where Buildozer usually stores the IPA file
+          path: ios-ipa.zip
