@@ -47,7 +47,6 @@ ScreenManager:
     LoginScreen:
     SignUpScreen:
     HomeScreen:
-    PostScreen:
     ProfileScreen:
     CommunityScreen:
     ChatScreen:
@@ -57,7 +56,7 @@ ScreenManager:
     MDBoxLayout:
         orientation: 'vertical'
         padding: 20
-        spacing: 10
+        spacing: 30
         MDLabel:
             text: "Login"
             halign: 'center'
@@ -78,6 +77,9 @@ ScreenManager:
             size_hint_x: 0.8
             required: True
             password: True
+        MDFlatButton:
+            text: "forgot password?"
+            on_release: app.forgot_password()
         MDRaisedButton:
             text: "Login"
             pos_hint: {"center_x": 0.5}
@@ -165,72 +167,6 @@ ScreenManager:
                 size_hint_x: 0.8
                 on_release: app.switch_to_community()
             MDIconButton:
-                icon: "newspaper-plus"
-                pos_hint: {"center_x": 0.5}
-                size_hint_x: 0.8
-                on_release: app.switch_to_post()
-            MDIconButton:
-                icon: "account"
-                pos_hint: {"center_x": 0.5}
-                size_hint_x: 0.8
-                on_release: app.switch_to_profile()
-                         
-<PostScreen>:
-    name: "post"
-    MDBoxLayout:
-        padding: 20
-        spacing: 10
-        orientation: "vertical"
-        MDLabel:
-            text: "Upload"
-            halign: 'center'
-            theme_text_color: "Primary"
-            font_style: "H4"
-        MDBoxLayout:
-            orientation: "horizontal"
-            id: preview_box
-            size_hint_y: None
-            height: "125dp"
-            Video:
-                id: media_source
-                size_hint_x: 0.3
-                source: "logo.ico"
-                size_hint_y: 1
-            TextInput:
-                id: post_text
-                hint_text: "What's on your mind?"
-                size_hint_x: 0.7
-        MDIconButton:
-            icon: "multimedia"
-            pos_hint: {"center_x": 0.9}
-            size_hint_x: 0.8
-            on_release: app.select_media()
-        MDRaisedButton:
-            text: "POST"
-            pos_hint: {"center_x": 0.5}
-            size_hint_x: 0.2
-            on_release: app.post_update()
-        MDBoxLayout:
-            orientation: 'horizontal'
-            md_bg_color: 0, 0, 0, 0.1
-            size_hint_y: None
-            height: "50dp"
-            MDIconButton:
-                icon: "home"
-                pos_hint: {"center_x": 0.5}
-                size_hint_x: 0.8
-                on_release: app.switch_to_home()
-            MDIconButton:
-                icon: "account-group"
-                pos_hint: {"center_x": 0.5}
-                size_hint_x: 0.8
-                on_release: app.switch_to_community()
-            MDIconButton:
-                icon: "newspaper-plus"
-                pos_hint: {"center_x": 0.5}
-                size_hint_x: 0.8
-                on_release: app.switch_to_post()
-            MDIconButton:
                 icon: "account"
                 pos_hint: {"center_x": 0.5}
                 size_hint_x: 0.8
@@ -242,6 +178,10 @@ ScreenManager:
         padding: 20
         spacing: 10
         orientation: "vertical"
+        MDIconButton:
+            icon: "account-remove"
+            pos_hint: {"top": 0.95, "right": 1}
+            on_release: app.del_account_dialog()
         MDLabel:
             text: "Profile"
             halign: 'center'
@@ -319,11 +259,6 @@ ScreenManager:
                 size_hint_x: 0.8
                 on_release: app.switch_to_community()
             MDIconButton:
-                icon: "newspaper-plus"
-                pos_hint: {"center_x": 0.5}
-                size_hint_x: 0.8
-                on_release: app.switch_to_post()
-            MDIconButton:
                 icon: "account"
                 pos_hint: {"center_x": 0.5}
                 size_hint_x: 0.8
@@ -368,11 +303,6 @@ ScreenManager:
                 size_hint_x: 0.8
                 on_release: app.switch_to_community()
             MDIconButton:
-                icon: "newspaper-plus"
-                pos_hint: {"center_x": 0.5}
-                size_hint_x: 0.8
-                on_release: app.switch_to_post()
-            MDIconButton:
                 icon: "account"
                 pos_hint: {"center_x": 0.5}
                 size_hint_x: 0.8
@@ -411,9 +341,6 @@ class SignUpScreen(Screen):
 class HomeScreen(Screen):
     pass
     
-class PostScreen(Screen):
-    pass
-    
 class ProfileScreen(Screen):
     pass
 
@@ -431,7 +358,37 @@ MEDIA_DIR = "/storage/emulated/0/MemerDevs/Media"
 
 if not os.path.exists(MEDIA_DIR):
     os.makedirs(MEDIA_DIR)
-    
+
+@app.route('/upload_post', methods=['POST'])
+def post_update():
+    data = request.json
+    username = data.get('username')
+    post_text = data.get('caption')
+    media_path = data.get('media_path')
+    if not post_text and not media_path:
+        print("No content to post.")
+        return jsonify ({"message": "No content to post."})
+
+    # Upload media to Firebase storage if media is selected
+    media_url = ""
+    if media_path:
+        media_filename = f"media/{current_user}/{media_path.split('/')[-1]}"
+        storage.child(media_filename).put(media_path, user_id_token)
+        media_url = storage.child(media_filename).get_url(user_id_token)
+        print("Media uploaded, URL:", media_url)
+
+    # Post data to Firebase Database
+    post_data = {
+        "usename": username,
+        "text": post_text,
+        "media_url": media_url,
+        "likes": [],
+        "comments": []
+    }
+    db.child("posts").push(post_data, user_id_token)
+    return jsonify({"message": "Post created successfully."})
+    print("Post created successfully.")
+        
 @app.route('/get_posts', methods=['GET'])
 def get_posts():
     posts = db.child("posts").get(user_id_token).val()
@@ -527,6 +484,7 @@ class TokenManager:
 
 class MemerDevsApp(MDApp):
     media_path = None
+    global current_user
     current_user = None
     global user_id_token
     user_id_token = None
@@ -540,7 +498,7 @@ class MemerDevsApp(MDApp):
         return self.sm
         
     def switch_to_signup(self):
-        self.sm.current = "profile"
+        self.sm.current = "signup"
         
     def switch_to_login(self):
         self.sm.current = "login"
@@ -551,9 +509,6 @@ class MemerDevsApp(MDApp):
     def switch_to_community(self):
         self.check_if_user_in_community()
         
-    def switch_to_post(self):
-        self.sm.current = "post"
-        
     def switch_to_profile(self):
         self.sm.current = "profile"
         self.load_user_profile()
@@ -563,6 +518,7 @@ class MemerDevsApp(MDApp):
         
     def login(self):
         email = self.sm.get_screen('login').ids.login_email.text
+        global password
         password = self.sm.get_screen('login').ids.login_password.text
         try:
             user = auth.sign_in_with_email_and_password(email, password)
@@ -581,6 +537,7 @@ class MemerDevsApp(MDApp):
 
     def sign_up(self):
         email = self.sm.get_screen('signup').ids.signup_email.text
+        global password
         password = self.sm.get_screen('signup').ids.signup_password.text
         global username
         username = self.sm.get_screen("signup").ids.signup_username.text
@@ -590,6 +547,7 @@ class MemerDevsApp(MDApp):
             manager.start_timer()
             self.current_user = user['localId']
             self.user_id_token = user['idToken']
+            auth.send_email_verification(self.user_id_token)
             data = {
                 "username": username,
                 "photo_url": "https://firebasestorage.googleapis.com/v0/b/memerdevs.appspot.com/o/Default%2Fdefault-profile-pic.jpg?alt=media&token=8e017016-e28d-4bc6-81d0-bb96cd354d3e",
@@ -602,7 +560,66 @@ class MemerDevsApp(MDApp):
         except Exception as e:
             print("Sign-up failed:", e)
             self.notify("Sign Up failed", "Sign Up failed.")
-          
+            
+    def forgot_password(self):
+        self.email_popup = ModalView(size_hint_y=None, height="250dp", auto_dismiss=False)
+        box_layout = MDBoxLayout(orientation="vertical", md_bg_color=(1, 1, 1, 1))
+        label = MDLabel(text="Enter your email address and check your email to reset password.", bold=True, pos_hint={"center_x": 0.5})
+        self.pass_email_input = MDTextField(hint_text="Enter your email address.")
+        self.cont_button = MDRaisedButton(text="Continue", pos_hint={"right": 0.95}, on_release=self.send_pass_reset_email)
+        box_layout.add_widget(label)
+        box_layout.add_widget(self.pass_email_input)
+        box_layout.add_widget(self.cont_button)
+        self.email_popup.add_widget(box_layout)
+        self.email_popup.open()
+        
+    def send_pass_reset_email(self, obj):
+        try:
+            auth.send_password_reset_email(self.pass_email_input.text)
+            self.email_popup.dismiss()
+        except Exception:
+            self.notify("Password Reset", "Error occured")
+            self.email_popup.dismiss()
+        
+    def del_account_dialog(self):
+        self.del_acc_dialog = MDDialog(
+            text="Are you sure you want to delete your account?\n it will be deleted forever.",
+            buttons=[
+                MDFlatButton(text="NO", on_release=self.close_del_dialog),
+                MDRaisedButton(text="YES", on_release=self.delete_account)
+            ]
+        )
+        self.del_acc_dialog.open()
+        
+    def delete_account(self, obj):
+        self.acc_popup = ModalView(size_hint_y=None, height="300dp", auto_dismiss=False)
+        box_layout = MDBoxLayout(orientation="vertical", md_bg_color=(1, 1, 1, 1))
+        self.acc_label = MDLabel(text="Delete Account.", font_style="H3", pos_hint={"center_x": 0.5})
+        self.del_pass_input = MDTextField(hint_text="Confirm password.")
+        self.confirm_del_button = MDRaisedButton(text="Continue", pos_hint={"right": 0.95}, on_release=self.del_acc_conclusion)
+        box_layout.add_widget(self.acc_label)
+        box_layout.add_widget(self.del_pass_input)
+        box_layout.add_widget(self.confirm_del_button)
+        self.acc_popup.add_widget(box_layout)
+        self.acc_popup.open()
+        
+    def del_acc_conclusion(self, obj):
+        if self.del_pass_input == password:
+           try:
+               db.child("users").child(self.current_user).remove(self.user_id_token)
+               auth.delete_user_account(self.user_id_token)
+               self.notify("Account removal", "Account deleted successfully.")
+               self.acc_popup.dismiss()
+               self.switch_to_login()
+           except Exception:
+               self.notify("Account removal", "Error deleting account.")
+               self.acc_popup.dismiss()
+        else:
+           self.del_pass_input.error = True
+    
+    def close_del_dialog(self):
+        self.del_acc_dialog.dismiss()
+        
     def check_if_user_in_community(self):
         user_data = db.child("users").child(self.current_user).get(self.user_id_token).val()
 
@@ -832,59 +849,6 @@ class MemerDevsApp(MDApp):
             self.image_path = selection[0]
             print("image selected: ", self.image_path)
             self.sm.get_screen("profile").ids.profile_picture.source = f"{self.image_path}"
-            self.image_popup.dismiss()
-
-    def select_media(self):
-        content = FileChooserIconView(filters=["*.mp4", "*.jpeg", "*.jpg", "*.webp", "*.gif", "*.png", "*.heic", "*.ico"], size_hint=(1, 1))
-        
-        self.file_popup = Popup(title="Select media", content=content, size_hint=(0.9, 0.9))
-        content.bind(selection=self.on_file_select)
-        self.file_popup.open()
-        
-    def on_file_select(self, instance, selection):
-        if selection:
-            self.media_path = selection[0]
-            print("media selected: ", self.media_path)
-            self.display_preview()
-            self.file_popup.dismiss()
-            
-    def display_preview(self):
-        post_screen = self.sm.get_screen('post')
-        self.media_source = post_screen.ids.media_source
-        if self.media_path.lower().endswith(('.mp4', '.webm', '.mpeg', '.avi')):
-            self.notify("Media Preview", "Preview for videos is not available at the moment.")
-        else:
-            self.media_source.source = f"{self.media_path}"
-
-    def post_update(self):
-        post_text = self.sm.get_screen('post').ids.post_text.text
-        if not post_text and not self.media_path:
-            print("No content to post.")
-            self.notify("Post", "No content to post.")
-            return
-
-        # Upload media to Firebase storage if media is selected
-        media_url = ""
-        if self.media_path:
-            media_filename = f"media/{self.current_user}/{self.media_path.split('/')[-1]}"
-            storage.child(media_filename).put(self.media_path, self.user_id_token)
-            media_url = storage.child(media_filename).get_url(self.user_id_token)
-            print("Media uploaded, URL:", media_url)
-
-        # Post data to Firebase Database
-        post_data = {
-            "usename": username,
-            "text": post_text,
-            "media_url": media_url,
-            "likes": [],
-            "comments": []
-        }
-        db.child("posts").push(post_data, self.user_id_token)
-        print("Post created successfully.")
-        self.notify("Post", "Post created successfully.")
-        self.media_source.source = "logo.ico"
-        self.sm.get_screen('post').ids.post_text.text = ""
-        self.switch_to_home()
 
     def show_medias(self):
         flask_thread = Thread(target=run_flask)
@@ -897,7 +861,7 @@ class MemerDevsApp(MDApp):
         box_layout.add_widget(redirect_button)
         
     def open_link(self, instance):
-        webbrowser.open("https://memerdevs.web.ap")
+        webbrowser.open("https://memerdevs.web.app")
 
 if __name__ == '__main__':
     MemerDevsApp().run()
