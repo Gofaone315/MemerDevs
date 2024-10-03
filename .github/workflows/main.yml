@@ -53,8 +53,7 @@ jobs:
             libtinfo5 \
             cmake \
             libffi-dev \
-            libssl-dev \
-            nodejs
+            libssl-dev
           export PATH=$PATH:~/.local/bin/
         shell: bash
 
@@ -89,7 +88,7 @@ jobs:
         shell: bash
 
       - name: Upload compressed APK as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: android-apk
           path: android-apk.zip
@@ -116,7 +115,7 @@ jobs:
       - name: Install system dependencies
         run: |
           brew update
-          brew install git autoconf automake libtool pkg-config nodejs
+          brew install git autoconf automake libtool pkg-config
           python3 -m pip install --upgrade Cython==0.29.33 buildozer pbxproj setuptools
         shell: bash
 
@@ -143,14 +142,17 @@ jobs:
         shell: bash
 
       - name: Upload compressed IPA as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: ios-ipa
           path: ios-ipa.zip
 
   build-executables:
     name: Build Python Executables
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]  # Run on Linux, Windows, and macOS
 
     steps:
       - name: Checkout code
@@ -164,14 +166,20 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install imageio kivy kivymd flask flask-cors pyrebase4 plyer nodejs
+          pip install imageio kivy kivymd flask flask-cors pyrebase4 plyer
 
       - name: Install Nuitka
         run: python -m pip install nuitka
 
       - name: Build Executable
         run: |
-          python -m nuitka --standalone --onefile --product-name=MemerDevs --output-dir=dist main.py
+          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+            python -m nuitka --standalone --static-libpython=yes --linux-icon=logo.ico --onefile --output-dir=dist main.py
+          elif [ "${{ matrix.os }}" == "windows-latest" ]; then
+            python -m nuitka --standalone --onefile --windows-company-name="Gofaone Tlalang" --windows-product-name="MemerDevs" --file-version=1.0.0.0 --product-version=1.0.0.0 --output-dir=dist main.py
+          elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+            python -m nuitka --standalone --macos-app-icon=logo.ico --static-libpython=yes --onefile --output-dir=dist main.py
+          fi
         shell: bash
 
       - name: Clean up intermediate build files
@@ -181,11 +189,11 @@ jobs:
 
       - name: Compress Executables (Max Compression)
         run: |
-          zip -9 -r executables.zip dist/*
+          zip -9 -r executables-${{ matrix.os }}.zip dist/*
         shell: bash
 
-      - name: Archive Compressed Artifacts
-        uses: actions/upload-artifact@v4
+      - name: Upload OS-specific Executables as artifact
+        uses: actions/upload-artifact@v3
         with:
-          name: executables
-          path: executables.zip
+          name: executables-${{ matrix.os }}
+          path: executables-${{ matrix.os }}.zip
