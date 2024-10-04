@@ -171,6 +171,15 @@ jobs:
       - name: Install Nuitka
         run: python -m pip install nuitka
 
+      - name: Install Dependency Walker (Windows-only)
+        if: runner.os == 'Windows'
+        run: |
+          curl -LO http://www.dependencywalker.com/depends22_x64.zip
+          unzip depends22_x64.zip -d dependency_walker
+          echo "Adding Dependency Walker to PATH"
+          echo "::add-path::$(pwd)/dependency_walker"
+        shell: bash
+
       - name: Build Executable
         run: |
           if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
