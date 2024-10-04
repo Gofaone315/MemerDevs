@@ -176,8 +176,7 @@ jobs:
         run: |
           curl -LO http://www.dependencywalker.com/depends22_x64.zip
           unzip depends22_x64.zip -d dependency_walker
-          echo "Adding Dependency Walker to PATH"
-          echo "::add-path::$(pwd)/dependency_walker"
+          echo "dependency_walker" >> $GITHUB_PATH
         shell: bash
 
       - name: Build Executable
