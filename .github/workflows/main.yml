@@ -171,20 +171,12 @@ jobs:
       - name: Install Nuitka
         run: python -m pip install nuitka
 
-      - name: Install Dependency Walker (Windows-only)
-        if: runner.os == 'Windows'
-        run: |
-          curl -LO http://www.dependencywalker.com/depends22_x64.zip
-          unzip depends22_x64.zip -d dependency_walker
-          echo "dependency_walker" >> $GITHUB_PATH
-        shell: bash
-
       - name: Build Executable
         run: |
           if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
             python -m nuitka --standalone --static-libpython=yes --linux-icon=logo.ico --onefile --output-dir=dist main.py
           elif [ "${{ matrix.os }}" == "windows-latest" ]; then
-            python -m nuitka --standalone --onefile --windows-company-name="Gofaone Tlalang" --windows-product-name="MemerDevs" --file-version=1.0.0.0 --product-version=1.0.0.0 --output-dir=dist main.py
+            python -m nuitka --windows-company-name="Gofaone Tlalang" --windows-product-name="MemerDevs" --file-version=1.0.0.0 --product-version=1.0.0.0 --output-dir=dist main.py
           elif [ "${{ matrix.os }}" == "macos-latest" ]; then
             python -m nuitka --standalone --macos-app-icon=logo.ico --static-libpython=yes --onefile --output-dir=dist main.py
           fi
