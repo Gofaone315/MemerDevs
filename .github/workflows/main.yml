@@ -149,11 +149,7 @@ jobs:
 
   build-executables:
     name: Build Python Executables
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]  # Run on Linux, Windows, and macOS
-
+    runs-on: windows-latest  # Windows only for executables
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -173,13 +169,7 @@ jobs:
 
       - name: Build Executable
         run: |
-          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
-            python -m nuitka --standalone --static-libpython=yes --linux-icon=logo.ico --onefile --output-dir=dist main.py
-          elif [ "${{ matrix.os }}" == "windows-latest" ]; then
-            python -m nuitka --windows-company-name="Gofaone Tlalang" --windows-product-name="MemerDevs" --file-version=1.0.0.0 --product-version=1.0.0.0 --output-dir=dist main.py
-          elif [ "${{ matrix.os }}" == "macos-latest" ]; then
-            python -m nuitka --standalone --macos-app-icon=logo.ico --static-libpython=yes --onefile --output-dir=dist main.py
-          fi
+          python -m nuitka --windows-company-name="Gofaone Tlalang" --windows-product-name="MemerDevs" --file-version=1.0.0.0 --product-version=1.0.0.0 --output-dir=dist main.py
         shell: bash
 
       - name: Clean up intermediate build files
@@ -189,11 +179,11 @@ jobs:
 
       - name: Compress Executables (Max Compression)
         run: |
-          zip -9 -r executables-${{ matrix.os }}.zip dist/*
+          zip -9 -r executables-windows.zip dist/*
         shell: bash
 
       - name: Upload OS-specific Executables as artifact
         uses: actions/upload-artifact@v3
         with:
-          name: executables-${{ matrix.os }}
-          path: executables-${{ matrix.os }}.zip
+          name: executables-windows
+          path: executables-windows.zip
