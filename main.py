@@ -19,6 +19,7 @@ from datetime import datetime
 import os
 import webbrowser
 from plyer import notification
+from kivymd.toast import toast
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from threading import Thread
@@ -148,6 +149,9 @@ ScreenManager:
             halign: 'center'
             theme_text_color: "Primary"
             font_style: "H4"
+        MDIcon:
+            icon: "access-point-network"
+            pos_hint: {"center_x": 0.5}
         MDBoxLayout:
             orientation: "vertical"
             id: server_results
@@ -179,7 +183,7 @@ ScreenManager:
         spacing: 10
         orientation: "vertical"
         MDIconButton:
-            icon: "account-remove"
+            icon: "delete-forever-outline"
             pos_hint: {"top": 0.95, "right": 1}
             on_release: app.del_account_dialog()
         MDLabel:
@@ -366,7 +370,7 @@ def post_update():
     post_text = data.get('caption')
     media_path = data.get('media_path')
     if not post_text and not media_path:
-        print("No content to post.")
+        toast("No content to post.")
         return jsonify ({"message": "No content to post."})
 
     # Upload media to Firebase storage if media is selected
@@ -387,13 +391,22 @@ def post_update():
     }
     db.child("posts").push(post_data, user_id_token)
     return jsonify({"message": "Post created successfully."})
-    print("Post created successfully.")
+    toast("Post created successfully.")
         
 @app.route('/get_posts', methods=['GET'])
 def get_posts():
     posts = db.child("posts").get(user_id_token).val()
     return jsonify(posts)
 
+@app.route('/search_posts', methods=['POST'])
+def search_posts():
+    posts = db.child("posts").get(user_id_token).val()
+    data = request.json
+    search_input = data.get("search_input")
+    for text in posts.get("text"):
+        if search_input in text:
+            return jsonify(posts)
+    
 @app.route('/get_username', methods=['GET'])
 def get_username():
     return jsonify({"username": username})
@@ -422,6 +435,7 @@ def download_media():
     try:
         import urllib.request
         urllib.request.urlretrieve(media_url, save_path)
+        toast(f"Media saved to {save_path}")
         return jsonify({"message": f"Media saved to {save_path}"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -477,9 +491,9 @@ class TokenManager:
         global user_id_token
         user_id_token = new_id_token
 
-    def refresh_id_token(user):
+    def refresh_id_token(self):
         # Refresh the token before it expires
-        refreshed_user = auth.refresh(user['refreshToken'])
+        refreshed_user = auth.refresh(self.user['refreshToken'])
         return refreshed_user['idToken']
 
 class MemerDevsApp(MDApp):
@@ -514,7 +528,8 @@ class MemerDevsApp(MDApp):
         self.load_user_profile()
         
     def notify(self, title, message):
-        notification.notify(title=f'{title}', message=f'{message}')
+        notification.notify(title=f'{title}', message=f'{message}', app_name='MemerDevs')
+        toast(f"{title}: {message}")
         
     def login(self):
         email = self.sm.get_screen('login').ids.login_email.text
@@ -533,7 +548,7 @@ class MemerDevsApp(MDApp):
             self.show_medias()
         except Exception as e:
             print("Invalid credentials:", e)
-            self.notify("Login failed", "Login failed.")
+            self.notify("Invalid credentials", "Login failed.")
 
     def sign_up(self):
         email = self.sm.get_screen('signup').ids.signup_email.text
@@ -559,7 +574,7 @@ class MemerDevsApp(MDApp):
             self.show_medias()
         except Exception as e:
             print("Sign-up failed:", e)
-            self.notify("Sign Up failed", "Sign Up failed.")
+            self.notify("Sign Up Error", "Error signing up.")
             
     def forgot_password(self):
         self.email_popup = ModalView(size_hint_y=None, height="250dp", auto_dismiss=False)
@@ -576,6 +591,7 @@ class MemerDevsApp(MDApp):
     def send_pass_reset_email(self, obj):
         try:
             auth.send_password_reset_email(self.pass_email_input.text)
+            toast("check your email for password reset link.")
             self.email_popup.dismiss()
         except Exception:
             self.notify("Password Reset", "Error occured")
@@ -607,6 +623,7 @@ class MemerDevsApp(MDApp):
         if self.del_pass_input == password:
            try:
                db.child("users").child(self.current_user).remove(self.user_id_token)
+               storage.delete(f"Profile_Pictures/{self.current_user}", self.user_id_token)
                auth.delete_user_account(self.user_id_token)
                self.notify("Account removal", "Account deleted successfully.")
                self.acc_popup.dismiss()
@@ -642,6 +659,7 @@ class MemerDevsApp(MDApp):
     def join_community(self, *args):
         db.child("users").child(self.current_user).update({"is_in_community": True}, self.user_id_token)
         self.close_dialog()
+        toast("Successfully joined communities.")
         self.sm.current = "community"
 
     def close_dialog(self):
@@ -827,6 +845,7 @@ class MemerDevsApp(MDApp):
             }
             if new_pp != db_user_data.get("profile_url", ""):
                 image_filename = f"Profile_Pictures/{self.current_user}/{new_pp.split('/')[-1]}"
+                storage.delete(f"Profile_Pictures/{self.current_user}", self.user_id_token)
                 storage.child(image_filename).put(self.image_path, self.user_id_token)
                 image_url = storage.child(image_filename).get_url(self.user_id_token)
                 user_data["profile_url"] = image_url
@@ -838,7 +857,7 @@ class MemerDevsApp(MDApp):
             self.toggle_edit_mode(False)
 
     def select_profile_picture(self):
-        content = FileChooserIconView(filters=["*.jpeg", "*.jpg", "*.png", "*.webp", "*ico"], size_hint=(1, 1))
+        content = FileChooserIconView(filters=["*.jpeg", "*.jpg", "*.png", "*.webp", "*.ico"], size_hint=(1, 1))
 
         self.image_popup = Popup(title="Select Profile Picture", content=content, size_hint=(0.9, 0.9))
         content.bind(selection=self.on_picture_select)
@@ -856,6 +875,7 @@ class MemerDevsApp(MDApp):
         home_screen = self.sm.get_screen('home')
         box_layout = home_screen.ids.server_results
         message = MDLabel(text="Running on browser...", pos_hint={"center_x": 0.5}, bold=True)
+        toast("URL: https://memerdevs.web.app")
         redirect_button = MDRaisedButton(text="Open Browser", pos_hint={"center_x": 0.5}, on_release=self.open_link)
         box_layout.add_widget(message)
         box_layout.add_widget(redirect_button)
