@@ -4,25 +4,30 @@ from kivymd.app import MDApp
 from kivymd.uix.textfield import MDTextField
 from kivymd.uix.label import MDLabel
 from kivymd.uix.boxlayout import MDBoxLayout
-from kivy.uix.video import Video
 from kivy.uix.modalview import ModalView
-from kivymd.uix.card import MDCard
-from kivymd.uix.list import MDList, OneLineListItem, TwoLineListItem
+from kivymd.uix.list import MDList, OneLineListItem, TwoLineListItem, OneLineAvatarListItem, ImageLeftWidget
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.popup import Popup
 from kivy.uix.filechooser import FileChooserIconView
-from kivy.clock import Clock, mainthread
+from kivy.clock import Clock
 from kivymd.uix.button import MDIconButton, MDRaisedButton, MDFlatButton
+from kivymd.uix.card import MDCard
+from kivy.uix.image import AsyncImage
+from kivymd.uix.fitimage import FitImage
 from kivymd.uix.dialog import MDDialog
 from kivy.uix.scrollview import ScrollView
+from kivy.uix.gridlayout import GridLayout
 from datetime import datetime
 import os
+import platform
 import webbrowser
 from plyer import notification
 from kivymd.toast import toast
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from threading import Thread
+from PIL import Image
+from io import BytesIO
+import requests
+import urllib.request
+import random
 import pyrebase
 
 # Firebase Configuration
@@ -49,6 +54,7 @@ ScreenManager:
     SignUpScreen:
     HomeScreen:
     ProfileScreen:
+    SettingsScreen:
     CommunityScreen:
     ChatScreen:
 
@@ -72,7 +78,7 @@ ScreenManager:
             required: True
         MDTextField:
             id: login_password
-            hint_text: "Password"
+            hint_text: "password"
             icon_right: "lock"
             pos_hint: {"center_x": 0.5}
             size_hint_x: 0.8
@@ -81,6 +87,8 @@ ScreenManager:
         MDFlatButton:
             text: "forgot password?"
             on_release: app.forgot_password()
+            pos_hint: {"center_x": 0.25}
+            theme_text_color: "Secondary"
         MDRaisedButton:
             text: "Login"
             pos_hint: {"center_x": 0.5}
@@ -90,7 +98,8 @@ ScreenManager:
             text: "Don't have an account? Sign Up"
             pos_hint: {"center_x": 0.5}
             halign: 'center'
-            theme_text_color: "Primary"
+            theme_text_color: "Custom"
+            text_color: "blue"
             on_press: app.switch_to_signup()
 
 <SignUpScreen>:
@@ -120,13 +129,28 @@ ScreenManager:
             required: True
         MDTextField:
             id: signup_password
-            hint_text: "Password"
+            hint_text: "password"
             icon_right: "lock"
             pos_hint: {"center_x": 0.5}
             size_hint_x: 0.8
             required: True
             password: True
+        MDBoxLayout:
+            size_hint_y: None
+            height: 80
+            md_bg_color: 0, 0, 0.4, 0.025
+            CheckBox:
+                id: checkbox
+                size_hint_x: 0.1
+                color: 0.1, 0.1, 0.4, 1
+                on_press: app.checkbox_state()
+            MDLabel:
+                text: "I agree to User Agreement"
+                size_hint_x: 0.3
+                color: 0.1, 0.1, 0.4, 0.9
         MDRaisedButton:
+            id: signup_button
+            disabled: True
             text: "Sign Up"
             pos_hint: {"center_x": 0.5}
             size_hint_x: 0.8
@@ -135,7 +159,8 @@ ScreenManager:
             text: "Already have an account? Login"
             pos_hint: {"center_x": 0.5, "center_y": 0}
             halign: 'center'
-            theme_text_color: "Primary"
+            theme_text_color: "Custom"
+            text_color: "blue"
             on_press: app.switch_to_login()
 
 <HomeScreen>:
@@ -149,12 +174,14 @@ ScreenManager:
             halign: 'center'
             theme_text_color: "Primary"
             font_style: "H4"
-        MDIcon:
-            icon: "access-point-network"
-            pos_hint: {"center_x": 0.5}
-        MDBoxLayout:
-            orientation: "vertical"
-            id: server_results
+            size_hint_y: None
+            height: "50dp"
+        ScrollView:
+            id: post_render
+        MDIconButton:
+            icon: "attachment-plus"
+            pos_hint: {"bottom": 1, "right": 1}
+            on_release: app.add_post()
         MDBoxLayout:
             orientation: 'horizontal'
             md_bg_color: 0, 0, 0, 0.1
@@ -175,6 +202,11 @@ ScreenManager:
                 pos_hint: {"center_x": 0.5}
                 size_hint_x: 0.8
                 on_release: app.switch_to_profile()
+            MDIconButton:
+                icon: "cog"
+                pos_hint: {"center_x": 0.5}
+                size_hint_x: 0.8
+                on_release: app.switch_to_settings()
             
 <ProfileScreen>:
     name: "profile"
@@ -182,10 +214,6 @@ ScreenManager:
         padding: 20
         spacing: 10
         orientation: "vertical"
-        MDIconButton:
-            icon: "delete-forever-outline"
-            pos_hint: {"top": 0.95, "right": 1}
-            on_release: app.del_account_dialog()
         MDLabel:
             text: "Profile"
             halign: 'center'
@@ -211,6 +239,17 @@ ScreenManager:
                 pos_hint: {"center_x": 0.5}
                 disabled: True
                 on_release: app.select_profile_picture()
+        MDBoxLayout:
+            orientation: "horizontal"
+            md_bg_color: 0, 0, 0, 0.05
+            MDLabel:
+                id: followers
+                bold: True
+                pos_hint: {"center_x": 0.5}
+            MDLabel:
+                id: following
+                bold: True
+                pos_hint: {"center_x": 0.5}
         # Username Field (Editable)
         MDTextField:
             id: username_field
@@ -267,30 +306,47 @@ ScreenManager:
                 pos_hint: {"center_x": 0.5}
                 size_hint_x: 0.8
                 on_release: app.switch_to_profile()
-                
-<CommunityScreen>:
-    name: "community"
+            MDIconButton:
+                icon: "cog"
+                pos_hint: {"center_x": 0.5}
+                size_hint_x: 0.8
+                on_release: app.switch_to_settings()
+
+<SettingsScreen>:
+    name: "settings"
     MDBoxLayout:
         padding: 20
         spacing: 10
         orientation: "vertical"
-        MDBoxLayout:
-            orientation: 'vertical'
+        MDLabel:
+            text: "Settings"
+            halign: 'center'
+            theme_text_color: "Primary"
+            font_style: "H4"
             size_hint_y: None
-            height: "200dp"
-            MDLabel:
-                text: "Available Sections"
-                size_hint_y: None
-                height: "40dp"
-                bold: True
-                pos_hint: {"top": 1}
-            ScrollView:
-                MDList:
-                    id: section_list
-            MDIconButton:
-                icon: "chat-plus"
-                pos_hint: {"bottom": 1, "right": 1}
-                on_release: app.show_create_section_dialog()
+            height: "50dp"
+        ScrollView:
+            MDList:
+                OneLineIconListItem:
+                    text: "Become a patreon."
+                    on_release: app.support()
+                    IconLeftWidget:
+                        icon: "hand-coin"
+                OneLineIconListItem:
+                    text: "Change password"
+                    on_release: app.forgot_password()
+                    IconLeftWidget:
+                        icon: "key"
+                OneLineIconListItem:
+                    text: "Delete Account"
+                    on_release: app.del_account_dialog()
+                    IconLeftWidget:
+                        icon: "delete-forever-outline"
+                OneLineIconListItem:
+                    text: "Legal Information"
+                    on_release: app.legal_info()
+                    IconLeftWidget:
+                        icon: "file-document-multiple"
         MDBoxLayout:
             orientation: 'horizontal'
             md_bg_color: 0, 0, 0, 0.1
@@ -311,29 +367,91 @@ ScreenManager:
                 pos_hint: {"center_x": 0.5}
                 size_hint_x: 0.8
                 on_release: app.switch_to_profile()
+            MDIconButton:
+                icon: "cog"
+                pos_hint: {"center_x": 0.5}
+                size_hint_x: 0.8
+                on_release: app.switch_to_settings()
+
+<CommunityScreen>:
+    name: "community"
+    MDBoxLayout:
+        padding: 20
+        spacing: 10
+        orientation: "vertical"
+        MDBoxLayout:
+            orientation: "horizontal"
+            size_hint_y: None
+            height: "50dp"
+            MDLabel:
+                text: "Available Sections"
+                bold: True
+        ScrollView:
+            MDList:
+                id: section_list
+        MDIconButton:
+            icon: "chat-plus"
+            pos_hint: {"bottom": 1, "right": 1}
+            on_release: app.show_create_section_dialog()
+        MDBoxLayout:
+            orientation: 'horizontal'
+            md_bg_color: 0, 0, 0, 0.1
+            size_hint_y: None
+            height: "50dp"
+            MDIconButton:
+                icon: "home"
+                pos_hint: {"center_x": 0.5}
+                size_hint_x: 0.8
+                on_release: app.switch_to_home()
+            MDIconButton:
+                icon: "account-group"
+                pos_hint: {"center_x": 0.5}
+                size_hint_x: 0.8
+                on_release: app.switch_to_community()
+            MDIconButton:
+                icon: "account"
+                pos_hint: {"center_x": 0.5}
+                size_hint_x: 0.8
+                on_release: app.switch_to_profile()
+            MDIconButton:
+                icon: "cog"
+                pos_hint: {"center_x": 0.5}
+                size_hint_x: 0.8
+                on_release: app.switch_to_settings()
                 
 <ChatScreen>:
     name: "chat"
-    MDIconButton:
-        icon: "keyboard-backspace"
-        pos_hint: {"top": 1, "left": 1}
-        on_release: app.switch_to_community()
-    ScrollView:
-        MDBoxLayout:
-            id: chat_area
-            orientation: "vertical"
-            size_hint_y: None
-            height: self.minimum_height
     MDBoxLayout:
-        size_hint_y: None
-        height: "50dp"
-        MDTextField:
-            id: message_input
-            hint_text: "Type your message..."
-            multiline: True
-        MDRaisedButton:
-            text: "Send"
-            on_release: app.send_message_to_current_section()
+        orientation: "vertical"
+        MDBoxLayout:
+            orientation: "horizontal"
+            size_hint_y: None
+            height: "50dp"
+            md_bg_color: 0.1, 0.1, 0.1, 0.1
+            MDIconButton:
+                icon: "keyboard-backspace"
+                on_release: app.switch_to_community()
+            MDLabel:
+                id: section_name
+                bold: True
+        ScrollView:
+            MDBoxLayout:
+                id: chat_area
+                spacing: 20
+                padding: 20
+                orientation: "vertical"
+                size_hint_y: None
+                height: self.minimum_height
+        MDBoxLayout:
+            size_hint_y: None
+            height: "50dp"
+            MDTextField:
+                id: message_input
+                hint_text: "Type your message..."
+                multiline: True
+            MDIconButton:
+                icon: "send"
+                on_release: app.send_message_to_current_section()
 '''
 
 class LoginScreen(Screen):
@@ -353,123 +471,350 @@ class CommunityScreen(Screen):
     
 class ChatScreen(Screen):
     pass
+    
+class SettingsScreen(Screen):
+    pass
 
-app = Flask(__name__)
-CORS(app)  # Enable CORS for cross-origin requests
+def get_media_dir():
+    system = platform.system()
 
-# Directory where media will be saved
-MEDIA_DIR = "/storage/emulated/0/MemerDevs/Media"
+    if system == "Linux" or system == "Darwin":
+        if "iPhone" in platform.platform() or "iPad" in platform.platform():
+            media_dir = os.path.expanduser("~/Documents/MemerDevs/Media")
+        else:
+            media_dir = os.path.expanduser("~/MemerDevs/Media")
+    elif system == "Windows":
+        media_dir = os.path.join(os.getenv('USERPROFILE'), "MemerDevs", "Media")
+    elif system == "Android":
+        media_dir = "/storage/emulated/0/MemerDevs/Media"
+    else:
+        raise Exception("Unsupported platform")
 
-if not os.path.exists(MEDIA_DIR):
-    os.makedirs(MEDIA_DIR)
+    if not os.path.exists(media_dir):
+        os.makedirs(media_dir)
+    
+    return media_dir
 
-@app.route('/upload_post', methods=['POST'])
-def post_update():
-    data = request.json
-    username = data.get('username')
-    post_text = data.get('caption')
-    media_path = data.get('media_path')
-    if not post_text and not media_path:
-        toast("No content to post.")
-        return jsonify ({"message": "No content to post."})
+MEDIA_DIR = get_media_dir()
+            
+class PostRenderer(MDList):
+    def __init__(self, posts, user_id_token, **kwargs):
+        super().__init__(**kwargs)
+        self.render_posts(posts)
+        self.spacing = 10
+        self.user_id_token = user_id_token
 
-    # Upload media to Firebase storage if media is selected
-    media_url = ""
-    if media_path:
-        media_filename = f"media/{current_user}/{media_path.split('/')[-1]}"
-        storage.child(media_filename).put(media_path, user_id_token)
-        media_url = storage.child(media_filename).get_url(user_id_token)
-        print("Media uploaded, URL:", media_url)
+    def render_posts(self, posts):
+        for post in posts:
+            post_key = post["postId"]
+            post_card = MDCard(orientation='vertical', padding=10, size_hint_y=None)
+            post_card.height = "500dp"
 
-    # Post data to Firebase Database
-    post_data = {
-        "usename": username,
-        "text": post_text,
-        "media_url": media_url,
-        "likes": [],
-        "comments": []
-    }
-    db.child("posts").push(post_data, user_id_token)
-    return jsonify({"message": "Post created successfully."})
-    toast("Post created successfully.")
+            username_label = MDFlatButton(
+                text=post['username'], 
+                theme_text_color='Primary', 
+                halign='center',
+                font_size=48
+            )
+            username_label.bind(on_release=lambda instance: self.view_profile(post['userId']))
+            post_card.add_widget(username_label)
+
+            # Post text
+            if 'text' in post:
+                post_text = MDLabel(
+                    text=post['text'],
+                    theme_text_color='Secondary',
+                    halign='center'
+                )
+                post_card.add_widget(post_text)
+
+            # Post image
+            if post['media_url'] != "":
+                post_image = AsyncImage(source=post['media_url'], size_hint_y=None, size_hint_x=0.7, pos_hint={"center_x": 0.5})
+                post_image.height = "300dp"
+                post_card.add_widget(post_image)
+                button_layout = MDBoxLayout(orientation="horizontal", size_hint_y=None, height="50dp")
+
+            # Like button with dynamic heart
+            is_liked = post.get('likes') and username in post['likes']
+            self.like_icon = 'heart' if is_liked else 'heart-outline'
+            self.like_button = MDIconButton(
+                icon=self.like_icon,
+                on_release=lambda x, post_key=post_key: self.like_post(post_key)
+            )
+            self.like_len = MDLabel(text=f'{len(post.get("likes", []))}')
+            button_layout.add_widget(self.like_button)
+            button_layout.add_widget(self.like_len)
+
+            comments_button = MDIconButton(
+                icon="comment-outline",
+                on_release=lambda x, post_key=post_key: self.show_comments(post_key)
+            )
+            self.comments_len = MDLabel(text=f'{len(post.get("comments", []))}')
+            button_layout.add_widget(comments_button)
+            button_layout.add_widget(self.comments_len)
+            
+            if 'media_url' in post:
+                download_button = MDIconButton(
+                    icon="download",
+                    on_release=lambda x, media_url=post['media_url']: self.download_post(media_url)
+                )
+                button_layout.add_widget(download_button)
+
+            views_label = MDLabel(
+                text=f'Views: {post["views"]}',
+                theme_text_color='Secondary',
+                halign='left'
+            )
+            button_layout.add_widget(views_label)
+            post_card.add_widget(button_layout)
+
+            self.add_widget(post_card)
+            
+    def view_profile(self, user_id):
+        if user_id != current_user:
+            user_data = db.child("users").child(user_id).get(self.user_id_token).val()
+            if user_data:
+                profile_screen = UserProfile(user_data=user_data, user_id_token=self.user_id_token)
+                profile_screen.open()
+            else:
+                toast("User not found.")
+        else:
+            MDApp.get_running_app().switch_to_profile()
+
+    def like_post(self, post_key):
+        # Fetch post data from Firebase
+        post_data = db.child("posts").child(post_key).get(self.user_id_token).val()
+        likes = post_data.get("likes", [])
         
-@app.route('/get_posts', methods=['GET'])
-def get_posts():
-    posts = db.child("posts").get(user_id_token).val()
-    return jsonify(posts)
+        # Toggle like status
+        if username not in likes:
+            likes.append(username)
+        else:
+            likes.remove(username)
 
-@app.route('/search_posts', methods=['POST'])
-def search_posts():
-    posts = db.child("posts").get(user_id_token).val()
-    data = request.json
-    search_input = data.get("search_input")
-    for text in posts.get("text"):
-        if search_input in text:
-            return jsonify(posts)
-    
-@app.route('/get_username', methods=['GET'])
-def get_username():
-    return jsonify({"username": username})
-  
-@app.route('/like_post', methods=['POST'])
-def like_post():
-    data = request.json
-    post_key = data.get('post_key')
-    username = data.get('username')
+        # Update post likes in Firebase
+        db.child("posts").child(post_key).update({"likes": likes}, self.user_id_token)
+        toast(f"{'Liked' if username in likes else 'Unliked'} the post.")
+        is_liked = likes and username in likes
+        self.like_icon = 'heart' if is_liked else 'heart-outline'
+        self.like_button.icon = self.like_icon
+        self.like_len.text = f"{len(likes)}"
 
-    post_data = db.child("posts").child(post_key).get(user_id_token).val()
-    likes = post_data.get("likes", [])
-
-    if username not in likes:
-        likes.append(username)
-        db.child("posts").child(post_key).update({"likes": likes}, user_id_token)
-    
-    return jsonify({"message": "Post liked.", "likes": len(likes)})
-
-@app.route('/download_media', methods=['POST'])
-def download_media():
-    data = request.json
-    media_url = data.get('media_url')
-    save_path = os.path.join(MEDIA_DIR, media_url.split("/")[-1])
-    
-    try:
-        import urllib.request
-        urllib.request.urlretrieve(media_url, save_path)
-        toast(f"Media saved to {save_path}")
-        return jsonify({"message": f"Media saved to {save_path}"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/get_comments', methods=['POST'])
-def get_comments():
-    data = request.json
-    post_key = data.get('post_key')
-    post_data = db.child("posts").child(post_key).get(user_id_token).val()
-    comments = post_data.get("comments", [])
-    return jsonify(comments)
-
-@app.route('/add_comment', methods=['POST'])
-def add_comment():
-    data = request.json
-    post_key = data.get('post_key')
-    comment_text = data.get('comment_text')
-    username = data.get('username')
-
-    if comment_text:
-        post_data = db.child("posts").child(post_key).get(user_id_token).val()
+    def show_comments(self, post_key):
+        post_data = db.child("posts").child(post_key).get(self.user_id_token).val()
         comments = post_data.get("comments", [])
+        
+        self.comments_screen = ModalView(auto_dismiss=True)
 
-        new_comment = {"username": username, "text": comment_text}
-        comments.append(new_comment)
+        comments_slideshow = self.create_comments_slideshow(comments)
+        self.comments_screen.add_widget(comments_slideshow)
+        comment_field_layout = MDBoxLayout(orientation="horizontal", spacing=10)
+        comment_field = MDTextField(
+            hint_text="Add a comment...",
+            size_hint_x=0.9,
+            pos_hint={'center_x': 0.5},
+            multiline=True
+        )
+        comment_field_layout.add_widget(comment_field)
 
-        db.child("posts").child(post_key).update({"comments": comments}, user_id_token)
+        submit_button = MDIconButton(
+            icon="send",
+            on_release=lambda x: self.add_comment(post_key, comment_field.text)
+        )
+        comment_field_layout.add_widget(submit_button)
+        self.comments_screen.add_widget(comment_field_layout)
+        self.comments_screen.open()
 
-        return jsonify({"message": "Comment added.", "comments": comments})
-    return jsonify({"message": "Comment text is required."}), 400
-    
-def run_flask():
-    app.run(debug=False, use_reloader=False, port=5000)
-    
+    def create_comments_slideshow(self, comments):
+        slideshow_layout = MDBoxLayout(orientation='vertical', md_bg_color=(1, 1, 1, 1))
+        comment_scrollview = ScrollView()
+        comment_listview = MDList(spacing=10)
+        slideshow_layout.add_widget(comment_scrollview)
+        comment_scrollview.add_widget(comment_listview)
+
+        for comment in comments:
+            comment_user = db.child("users").child(current_user).get(self.user_id_token).val()
+            comment_card = MDBoxLayout(
+                orientation='vertical',
+                size_hint_y=None,
+                height="80dp",
+                md_bg_color=(0.1, 0.1, 0.3, 0.1),
+                radius=(30, 30, 30, 30)
+            )
+
+            header_box = MDBoxLayout(
+                orientation='horizontal',
+                size_hint_y=None,
+                height="40dp",
+                md_bg_color=(0.05, 0.05, 0.15, 0.1)
+            )
+
+            avatar = ImageLeftWidget(source=comment_user.get("photo_url",""), radius=(100, 100, 100, 100), size_hint_x=0.15)
+            header_box.add_widget(avatar)
+
+            sender_label = MDLabel(
+                text=comment_user.get("username",""),
+                halign="left",
+                font_style="Subtitle1" 
+            )
+            header_box.add_widget(sender_label)
+
+        comment_card.add_widget(header_box)
+
+            message_text = MDLabel(
+                text=comment['text'],
+                color=(0.1, 0.1, 0.4, 0.9),
+                halign="left",
+                size_hint_y=None,
+                height="40dp"
+            )
+            comment_card.add_widget(message_text)
+            
+            comment_listview.add_widget(comment_card)
+        
+        return slideshow_layout
+
+    def get_current_time(self):
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+    def add_comment(self, post_key, comment_text):
+        if comment_text:
+            post_data = db.child("posts").child(post_key).get(self.user_id_token).val()
+            comments = post_data.get("comments", [])
+
+            new_comment = {"user": current_user, "text": comment_text, "timestamp": self.get_current_time()}
+            comments.append(new_comment)
+
+            db.child("posts").child(post_key).update({"comments": comments}, self.user_id_token)
+
+            toast("Comment added.")
+            self.comments_screen.dismiss()
+            self.comments_len.text = f"{len(comments)}"
+        else:
+            toast("Comment text cannot be empty.")
+
+    def download_post(self, media_url):
+        filename = media_url.split("/")[-1].split("?")[0].split("%2F")[-1]
+        save_path = os.path.join(MEDIA_DIR, filename)
+        try:
+            urllib.request.urlretrieve(media_url, save_path)
+            toast(f"File downloaded successfully and saved as: {save_path}")
+        except Exception as e:
+            print(f"Error downloading the file: {e}")
+        
+class UserProfile(ModalView):
+    def __init__(self, user_data, user_id_token, **kwargs):
+        super().__init__(**kwargs)
+        self.size_hint=(None, None)
+        self.size =("300dp", "400dp")
+        self.padding = 10
+        self.auto_dismiss = True
+        self.user_data = user_data
+        self.user_id_token = user_id_token
+        self.render_profile(user_data)
+
+    def render_profile(self, user_data):
+        # Main profile card
+        profile_card = MDCard(orientation='vertical', padding=20, size_hint=(None, None), size=("300dp", "400dp"))
+        
+        # User Details Layout
+        user_details_layout = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height="150dp")
+
+        # User Avatar
+        avatar = FitImage(
+            source=user_data.get("photo_url", ""),  # You can replace with actual image link
+            size_hint=(None, None),
+            size=("120dp", "120dp"),
+            radius=(50, 50, 50, 50)
+        )
+        user_details_layout.add_widget(avatar)
+
+        # User Text Layout
+        user_text_layout = MDBoxLayout(orientation='vertical', padding=10)
+        
+        # Username
+        username_label = MDLabel(
+            text=f"Username: {user_data.get('username', 'N/A')}",
+            theme_text_color="Primary"
+        )
+        user_text_layout.add_widget(username_label)
+
+        # Bio
+        bio_label = MDLabel(
+            text=f"Bio: {user_data.get('bio', 'N/A')}",
+            theme_text_color="Secondary"
+        )
+        user_text_layout.add_widget(bio_label)
+
+        user_details_layout.add_widget(user_text_layout)
+        profile_card.add_widget(user_details_layout)
+
+        # User Interactions (Likes, Followers, Following)
+        interactions_layout = MDBoxLayout(orientation='horizontal', padding=10)
+        
+        self.followers_label = MDLabel(
+            text=f"Followers: {len(user_data.get('followers', []))}",
+            theme_text_color="Primary"
+        )
+        interactions_layout.add_widget(self.followers_label)
+
+        following_label = MDLabel(
+            text=f"Following: {len(user_data.get('following', []))}",
+            theme_text_color="Primary"
+        )
+        interactions_layout.add_widget(following_label)
+
+        profile_card.add_widget(interactions_layout)
+
+        # Add the profile card to the layout
+        self.add_widget(profile_card)
+
+        # Buttons Section
+        buttons_layout = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height="50dp", padding=(0, 20))
+
+        # Follow Button with dynamic text
+        is_following = self.check_following_status(user_data.get('userId'))
+        follow_button_text = "Unfollow" if is_following else "Follow"
+
+        self.follow_button = MDRaisedButton(
+            text=follow_button_text,
+            on_release=lambda x: self.toggle_follow_user(user_data.get('userId'))
+        )
+        buttons_layout.add_widget(self.follow_button)
+        
+        self.add_widget(buttons_layout)
+
+    def check_following_status(self, user_id):
+        # Fetch the current user's data
+        current_user_data = db.child("users").child(current_user).get(self.user_id_token).val()
+        following = current_user_data.get('following', [])
+
+        # Check if the current user is following the profile user
+        return user_id in following
+
+    def toggle_follow_user(self, user_id):
+        current_user_data = db.child("users").child(current_user).get(self.user_id_token).val()
+        following = current_user_data.get('following', [])
+        if user_id in following:
+            following.remove(user_id)
+            self.follow_button.text = "Follow"
+        else:
+            following.append(user_id)
+            self.follow_button.text = "Unfollow"
+
+        db.child("users").child(current_user).update({'following': following}, self.user_id_token)
+
+        followers = self.user_data.get('followers', [])
+
+        if current_user in followers:
+            followers.remove(current_user)
+        else:
+            followers.append(current_user)
+
+        db.child("users").child(user_id).update({'followers': followers}, self.user_id_token)
+        self.followers_label.text = f"Followers: {len(followers)}"
+
 class TokenManager:
     def __init__(self, user):
         self.user = user
@@ -487,7 +832,7 @@ class TokenManager:
 
     def keep_token_fresh(self):
         new_id_token = self.refresh_id_token()
-        print("Token refreshed. New ID token:", new_id_token)
+        print("Token refreshed.")
         global user_id_token
         user_id_token = new_id_token
 
@@ -498,18 +843,19 @@ class TokenManager:
 
 class MemerDevsApp(MDApp):
     media_path = None
-    global current_user
-    current_user = None
-    global user_id_token
-    user_id_token = None
     edit_mode = False
     current_section_id = None
-    my_stream = None
     
     def build(self):
         self.theme_cls.primary_palette = "Blue"
         self.sm = Builder.load_string(KV)
         return self.sm
+        
+    def support(self):
+        webbrowser.open("https://patreon.com/gofaone315")
+        
+    def legal_info(self):
+        webbrowser.open("https://memerdevs.app.web/legal-information.html")
         
     def switch_to_signup(self):
         self.sm.current = "signup"
@@ -519,6 +865,7 @@ class MemerDevsApp(MDApp):
         
     def switch_to_home(self):
         self.sm.current = "home"
+        self.show_medias()
         
     def switch_to_community(self):
         self.check_if_user_in_community()
@@ -526,58 +873,69 @@ class MemerDevsApp(MDApp):
     def switch_to_profile(self):
         self.sm.current = "profile"
         self.load_user_profile()
+     
+    def switch_to_settings(self):
+        self.sm.current = "settings"
         
     def notify(self, title, message):
         notification.notify(title=f'{title}', message=f'{message}', app_name='MemerDevs')
-        toast(f"{title}: {message}")
-        
+    
+    def checkbox_state(self):
+        checkbox = self.sm.get_screen('signup').ids.checkbox
+        signup_btn = self.sm.get_screen('signup').ids.signup_button
+        if checkbox.active:
+            signup_btn.disabled = False
+        else:
+            signup_btn.disabled = True
+            
     def login(self):
         email = self.sm.get_screen('login').ids.login_email.text
-        global password
-        password = self.sm.get_screen('login').ids.login_password.text
+        self.password = self.sm.get_screen('login').ids.login_password.text
         try:
-            user = auth.sign_in_with_email_and_password(email, password)
+            user = auth.sign_in_with_email_and_password(email, self.password)
             manager = TokenManager(user)
             manager.start_timer()
-            self.current_user = user['localId']
+            global current_user
+            current_user = user['localId']
             self.user_id_token = user['idToken']
-            user_data = db.child("users").child(self.current_user).get(self.user_id_token).val()
+            user_data = db.child("users").child(current_user).get(self.user_id_token).val()
             global username
             username = user_data.get("username", "")
             self.switch_to_home()
-            self.show_medias()
         except Exception as e:
             print("Invalid credentials:", e)
             self.notify("Invalid credentials", "Login failed.")
 
     def sign_up(self):
         email = self.sm.get_screen('signup').ids.signup_email.text
-        global password
-        password = self.sm.get_screen('signup').ids.signup_password.text
+        self.password = self.sm.get_screen('signup').ids.signup_password.text
         global username
         username = self.sm.get_screen("signup").ids.signup_username.text
         try:
-            user = auth.create_user_with_email_and_password(email, password)
+            user = auth.create_user_with_email_and_password(email, self.password)
             manager = TokenManager(user)
             manager.start_timer()
-            self.current_user = user['localId']
+            global current_user
+            current_user = user['localId']
             self.user_id_token = user['idToken']
             auth.send_email_verification(self.user_id_token)
             data = {
                 "username": username,
                 "photo_url": "https://firebasestorage.googleapis.com/v0/b/memerdevs.appspot.com/o/Default%2Fdefault-profile-pic.jpg?alt=media&token=8e017016-e28d-4bc6-81d0-bb96cd354d3e",
                 "email": email,
-                "bio": "Hey there, i'm using MemerDevs!"
+                "bio": "Hey there, i'm using MemerDevs!",
+                "followers": [],
+                "following": []
             }
-            db.child("users").child(self.current_user).set(data, self.user_id_token)
+            db.child("users").child(current_user).set(data, self.user_id_token)
             self.switch_to_home()
             self.show_medias()
         except Exception as e:
             print("Sign-up failed:", e)
             self.notify("Sign Up Error", "Error signing up.")
-            
+        
     def forgot_password(self):
-        self.email_popup = ModalView(size_hint_y=None, height="250dp", auto_dismiss=False)
+        self.email_popup = ModalView(size_hint_y=None, height="250dp", auto_dismiss=True)
         box_layout = MDBoxLayout(orientation="vertical", md_bg_color=(1, 1, 1, 1))
         label = MDLabel(text="Enter your email address and check your email to reset password.", bold=True, pos_hint={"center_x": 0.5})
         self.pass_email_input = MDTextField(hint_text="Enter your email address.")
@@ -594,7 +952,7 @@ class MemerDevsApp(MDApp):
             toast("check your email for password reset link.")
             self.email_popup.dismiss()
         except Exception:
-            self.notify("Password Reset", "Error occured")
+            self.notify("password Reset", "Error occured")
             self.email_popup.dismiss()
         
     def del_account_dialog(self):
@@ -608,10 +966,10 @@ class MemerDevsApp(MDApp):
         self.del_acc_dialog.open()
         
     def delete_account(self, obj):
-        self.acc_popup = ModalView(size_hint_y=None, height="300dp", auto_dismiss=False)
+        self.acc_popup = ModalView(size_hint_y=None, height="300dp", auto_dismiss=True)
         box_layout = MDBoxLayout(orientation="vertical", md_bg_color=(1, 1, 1, 1))
         self.acc_label = MDLabel(text="Delete Account.", font_style="H3", pos_hint={"center_x": 0.5})
-        self.del_pass_input = MDTextField(hint_text="Confirm password.")
+        self.del_pass_input = MDTextField(hint_text="Confirm password.", password=True)
         self.confirm_del_button = MDRaisedButton(text="Continue", pos_hint={"right": 0.95}, on_release=self.del_acc_conclusion)
         box_layout.add_widget(self.acc_label)
         box_layout.add_widget(self.del_pass_input)
@@ -620,30 +978,46 @@ class MemerDevsApp(MDApp):
         self.acc_popup.open()
         
     def del_acc_conclusion(self, obj):
-        if self.del_pass_input == password:
-           try:
-               db.child("users").child(self.current_user).remove(self.user_id_token)
-               storage.delete(f"Profile_Pictures/{self.current_user}", self.user_id_token)
-               auth.delete_user_account(self.user_id_token)
-               self.notify("Account removal", "Account deleted successfully.")
-               self.acc_popup.dismiss()
-               self.switch_to_login()
-           except Exception:
-               self.notify("Account removal", "Error deleting account.")
-               self.acc_popup.dismiss()
+        if self.del_pass_input.text == self.password:
+            try:
+                # Remove user data from database
+                db.child("users").child(current_user).remove(self.user_id_token)
+            
+                # Try deleting profile picture if it exists
+                try:
+                    storage.delete(f"profile_pictures/{current_user}", self.user_id_token)
+                except Exception as e:
+                    print("Profile picture not found or couldn't be deleted:", e)
+
+                # Try deleting media files if they exist
+                try:
+                    storage.delete(f"media/{current_user}", self.user_id_token)
+                except Exception as e:
+                    print("Media files not found or couldn't be deleted:", e)
+            
+                # Delete user account
+                auth.delete_user_account(self.user_id_token)
+                self.notify("Account removal", "Account deleted successfully.")
+                self.acc_popup.dismiss()
+                self.switch_to_login()
+            
+            except Exception as e:
+                print("Error during account removal:", e)
+                self.notify("Account removal", "Error deleting account.")
+                self.acc_popup.dismiss()
         else:
-           self.del_pass_input.error = True
+            self.del_pass_input.error = True
     
-    def close_del_dialog(self):
+    def close_del_dialog(self, instance):
         self.del_acc_dialog.dismiss()
         
     def check_if_user_in_community(self):
-        user_data = db.child("users").child(self.current_user).get(self.user_id_token).val()
+        user_data = db.child("users").child(current_user).get(self.user_id_token).val()
 
         if not user_data.get("is_in_community", False):
             self.show_join_community_prompt()
         else:
-            self.load_available_sections
+            self.load_available_sections()
             self.sm.current = "community"
 
     def show_join_community_prompt(self):
@@ -657,10 +1031,11 @@ class MemerDevsApp(MDApp):
         self.join_community_dialog.open()
 
     def join_community(self, *args):
-        db.child("users").child(self.current_user).update({"is_in_community": True}, self.user_id_token)
+        db.child("users").child(current_user).update({"is_in_community": True}, self.user_id_token)
         self.close_dialog()
         toast("Successfully joined communities.")
         self.sm.current = "community"
+        self.load_available_sections()
 
     def close_dialog(self):
             self.join_community_dialog.dismiss()
@@ -668,14 +1043,15 @@ class MemerDevsApp(MDApp):
     def create_section(self, section_name):
         section_data = {
             "name": section_name,
-            "created_by": self.current_user,
-            "members": [self.current_user]
+            "created_by": current_user,
+            "members": [current_user]
         }
         db.child("sections").push(section_data, self.user_id_token)
 
     def load_available_sections(self):
         sections = db.child("sections").get(self.user_id_token).val()
         section_list = self.sm.get_screen('community').ids.section_list
+        section_list.clear_widgets()
 
         if sections:
             for section_id, section_data in sections.items():
@@ -690,7 +1066,7 @@ class MemerDevsApp(MDApp):
     def handle_section_click(self, section_id):
         section_data = db.child("sections").child(section_id).get(self.user_id_token).val()
 
-        if self.current_user not in section_data['members']:
+        if current_user not in section_data['members']:
             self.join_section(section_id)
         else:
             self.switch_section(section_id)
@@ -698,47 +1074,72 @@ class MemerDevsApp(MDApp):
     def join_section(self, section_id):
         section_data = db.child("sections").child(section_id).get(self.user_id_token).val()
         members = section_data.get('members', [])
-        if self.current_user not in members:
-            members.append(self.current_user)
+        if current_user not in members:
+            members.append(current_user)
             db.child("sections").child(section_id).update({"members": members}, self.user_id_token)
         self.switch_section(section_id)
 
     def load_messages(self, section_id):
+        self.sm.get_screen("chat").ids.chat_area.clear_widgets()
         messages = db.child("sections").child(section_id).child("messages").get(self.user_id_token).val()
         if messages:
             for msg_id, msg_data in messages.items():
                 self.display_message(msg_data)
 
-    @mainthread
     def display_message(self, msg_data):
         sender_id = msg_data['sender']
         sender_data = db.child("users").child(sender_id).get(self.user_id_token).val()
 
-        sender_name = sender_data['name']
+        sender_name = sender_data['username']
         sender_profile_pic = sender_data.get('photo_url', '')
 
         chat_screen = self.sm.get_screen('chat')
         chat_layout = chat_screen.ids.chat_area
-        chat_layout.add_widget(
-            MDBoxLayout(
-                orientation='horizontal',
-                size_hint_y=None,
-                height="40dp",
-                children=[
-                    MDIconButton(
-                        icon=sender_profile_pic,
-                        user_font_size="24sp",
-                        size_hint_x=None,
-                        width="40dp"
-                    ),
-                    MDLabel(
-                        text=f"{sender_name}:\n {msg_data['text']}",
-                        halign="left"
-                    )
-                ]
-            )
+
+        message_box = MDBoxLayout(
+            orientation='vertical',
+            size_hint_y=None,
+            height="80dp",
+            md_bg_color=(0.1, 0.1, 0.3, 0.1),
+            radius=(30, 30, 30, 30)
         )
 
+        # Create a horizontal layout for avatar and sender name
+        header_box = MDBoxLayout(
+            orientation='horizontal',
+            size_hint_y=None,
+            height="40dp",
+            md_bg_color=(0.05, 0.05, 0.15, 0.1)
+        )
+
+        # Add avatar (IconLeftWidget) to the header_box
+        avatar = ImageLeftWidget(source=sender_profile_pic, radius=(100, 100, 100, 100), size_hint_x=0.15)
+        header_box.add_widget(avatar)
+
+        # Add sender name to the header_box
+        sender_label = MDLabel(
+            text=sender_name,
+            halign="left",
+            font_style="Subtitle1"  # You can adjust the font style if needed
+        )
+        header_box.add_widget(sender_label)
+
+        # Add the header (avatar and name) to the message box
+        message_box.add_widget(header_box)
+
+        # Add the message text below the header
+        message_text = MDLabel(
+            text=msg_data['text'],
+            color=(0.1, 0.1, 0.4, 0.9),
+            halign="left",
+            size_hint_y=None,
+            height="40dp"
+        )
+        message_box.add_widget(message_text)
+
+        # Add the message box to the chat layout
+        chat_layout.add_widget(message_box)
+    
     def send_message_to_current_section(self):
         if not self.current_section_id:
             return
@@ -748,35 +1149,22 @@ class MemerDevsApp(MDApp):
             return
 
         message_data = {
-            "sender": self.current_user,
+            "sender": current_user,
             "text": message_text,
             "timestamp": self.get_current_time(),
         }
 
         db.child("sections").child(self.current_section_id).child("messages").push(message_data, self.user_id_token)
         self.sm.get_screen("chat").ids.message_input.text = ""
-
-    def start_message_listener(self, section_id):
-        self.my_stream = db.child("sections").child(section_id).child("messages").stream(self.on_new_message)
-
-    @mainthread
-    def on_new_message(self, message):
-        if message["data"] is not None:
-            self.display_message(message["data"])
-
-    def stop_message_listener(self):
-        if self.my_stream:
-            self.my_stream.close()
+        self.load_messages(self.current_section_id)
 
     def switch_section(self, new_section_id):
-        if self.my_stream:
-            self.stop_message_listener()
-
+        section_data = db.child("sections").child(new_section_id).get(self.user_id_token).val()
         self.current_section_id = new_section_id
         self.sm.current = "chat"
-        self.start_message_listener(new_section_id)
-        self.root.ids.chat_area.clear_widgets()
-        self.load_messages(new_section_id)
+        self.sm.get_screen("chat").ids.chat_area.clear_widgets()
+        self.sm.get_screen("chat").ids.section_name.text = f"{section_data['name']}"
+        self.load_messages(self.current_section_id)
 
     def get_current_time(self):
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -809,14 +1197,17 @@ class MemerDevsApp(MDApp):
         section_name = self.create_section_dialog.content_cls.text
         if section_name:
             self.create_section(section_name)
-            self.close_create_section_dialog()
+            self.create_section_dialog.dismiss()
+            self.load_available_sections()
         else:
             self.create_section_dialog.content_cls.error = True
         
     def load_user_profile(self):
-        user_data = db.child("users").child(self.current_user).get(self.user_id_token).val()
+        user_data = db.child("users").child(current_user).get(self.user_id_token).val()
         profile_screen = self.sm.get_screen('profile')
         profile_screen.ids.profile_picture.source = user_data.get("photo_url", "")
+        profile_screen.ids.followers.text = f"Followers: {len(user_data.get('followers', []))}"
+        profile_screen.ids.following.text = f"Following: {len(user_data.get('following', []))}"
         profile_screen.ids.username_field.text = user_data.get("username", "")
         profile_screen.ids.user_email_field.text = user_data.get("email", "")
         profile_screen.ids.bio_field.text = user_data.get("bio", "")
@@ -835,7 +1226,7 @@ class MemerDevsApp(MDApp):
         if self.edit_mode:
             # Save the changes to Firebase
             profile_screen = self.sm.get_screen('profile')
-            db_user_data = db.child("users").child(self.current_user).get(self.user_id_token).val()
+            db_user_data = db.child("users").child(current_user).get(self.user_id_token).val()
             new_username = profile_screen.ids.username_field.text
             new_bio = profile_screen.ids.bio_field.text
             new_pp = profile_screen.ids.profile_picture.source
@@ -843,13 +1234,12 @@ class MemerDevsApp(MDApp):
                 "username": new_username,
                 "bio": new_bio
             }
-            if new_pp != db_user_data.get("profile_url", ""):
-                image_filename = f"Profile_Pictures/{self.current_user}/{new_pp.split('/')[-1]}"
-                storage.delete(f"Profile_Pictures/{self.current_user}", self.user_id_token)
+            if new_pp != db_user_data.get("photo_url", ""):
+                image_filename = f"profile_pictures/{current_user}/{new_pp.split('/')[-1]}"
                 storage.child(image_filename).put(self.image_path, self.user_id_token)
                 image_url = storage.child(image_filename).get_url(self.user_id_token)
-                user_data["profile_url"] = image_url
-            db.child("users").child(self.current_user).update(user_data, self.user_id_token)
+                user_data["photo_url"] = image_url
+            db.child("users").child(current_user).update(user_data, self.user_id_token)
             print("Profile updated successfully.")
             self.notify("Profile Update", "Profile updated successfully.")
             
@@ -857,7 +1247,7 @@ class MemerDevsApp(MDApp):
             self.toggle_edit_mode(False)
 
     def select_profile_picture(self):
-        content = FileChooserIconView(filters=["*.jpeg", "*.jpg", "*.png", "*.webp", "*.ico"], size_hint=(1, 1))
+        content = FileChooserIconView(filters=["*.jpeg", "*.jpg", "*.png", "*.webp"], size_hint=(1, 1))
 
         self.image_popup = Popup(title="Select Profile Picture", content=content, size_hint=(0.9, 0.9))
         content.bind(selection=self.on_picture_select)
@@ -868,20 +1258,140 @@ class MemerDevsApp(MDApp):
             self.image_path = selection[0]
             print("image selected: ", self.image_path)
             self.sm.get_screen("profile").ids.profile_picture.source = f"{self.image_path}"
+            self.image_popup.dismiss()
 
     def show_medias(self):
-        flask_thread = Thread(target=run_flask)
-        flask_thread.start()
         home_screen = self.sm.get_screen('home')
-        box_layout = home_screen.ids.server_results
-        message = MDLabel(text="Running on browser...", pos_hint={"center_x": 0.5}, bold=True)
-        toast("URL: https://memerdevs.web.app")
-        redirect_button = MDRaisedButton(text="Open Browser", pos_hint={"center_x": 0.5}, on_release=self.open_link)
-        box_layout.add_widget(message)
-        box_layout.add_widget(redirect_button)
+        box_layout = home_screen.ids.post_render
+        box_layout.clear_widgets()
+        the_posts = self.get_posts()
+        post_renderer = PostRenderer(posts=the_posts, user_id_token=self.user_id_token)
+        box_layout.add_widget(post_renderer)
         
-    def open_link(self, instance):
-        webbrowser.open("https://memerdevs.web.app")
+    def add_post(self):
+        self.post_box = ModalView(size_hint_y=None, height="250dp", auto_dismiss=True)
+        box_layout = MDBoxLayout(orientation="vertical", md_bg_color=(1, 1, 1, 1))
+        self.caption = MDTextField(hint_text="caption")
+        layout = MDBoxLayout(orientation="horizontal", size_hint_y=None, height="50dp", spacing=10)
+        add_image = MDIconButton(icon="image-plus", on_release=self.add_image)
+        self.preview_image = AsyncImage(size_hint_x=0.5)
+        layout.add_widget(add_image)
+        layout.add_widget(self.preview_image)
+        post_button = MDRaisedButton(text="Upload", on_release=self.upload_post)
+        box_layout.add_widget(self.caption)
+        box_layout.add_widget(layout)
+        box_layout.add_widget(post_button)
+        self.post_box.add_widget(box_layout)
+        self.post_box.open()
+        
+    def add_image(self, instance):
+        content = FileChooserIconView(filters=["*.jpeg", "*.jpg", "*.png", "*.webp"], size_hint=(1, 1))
 
+        self.add_image_popup = Popup(title="Select Image", content=content, size_hint=(0.9, 0.9))
+        content.bind(selection=self.on_image_select)
+        self.add_image_popup.open()
+        
+    def on_image_select(self, instance, selection):
+        if selection:
+            self.post_image_path = selection[0]
+            print("image selected: ", self.post_image_path)
+            self.preview_image.source = self.post_image_path
+            self.add_image_popup.dismiss()
+
+    def watermark_image(self, file_path, upload_path):
+        img = Image.open(file_path)
+        img = Image.open(file_path)
+        watermark_url = "https://firebasestorage.googleapis.com/v0/b/memerdevs.appspot.com/o/Default%2Fwatermark.png?alt=media&token=82c4bb6a-9562-4fa9-a121-739a83aa79f7"
+        response = requests.get(watermark_url)
+        watermark = Image.open(BytesIO(response.content))
+        watermark.thumbnail((100, 100))
+        x, y = 10, 10
+        img.paste(watermark, (x, y), mask=watermark)
+        img_byte_arr = BytesIO()
+        img.save(img_byte_arr, format='PNG')
+        img_byte_arr.seek(0)
+        storage.child(upload_path).put(img_byte_arr, self.user_id_token)
+        print(f"Image uploaded to Firebase Storage at path: {upload_path}")
+            
+    def upload_post(self, obj):
+        post_text = self.caption.text
+        media = self.post_image_path
+
+        if not post_text and not media:
+            self.notify("Post", "No content to post.")
+        
+        media_url = ""
+        if media:
+            media_path = f"media/{current_user}/{username}@MemerDevs-{datetime.utcnow()}{media.split('/')[-1]}"
+            self.watermark_image(media, media_path)
+            media_url = storage.child(media_path).get_url(self.user_id_token)
+            print("Media uploaded, URL:", media_url)
+
+        timestamp = str(datetime.utcnow())
+
+        post_data = {
+            "userId": current_user,
+            "username": username,
+            "text": post_text,
+            "media_url": media_url,
+            "likes": [],
+            "comments": [],
+            "timestamp": timestamp,
+            "views": 0,
+            "viewed_by": []
+        }
+
+        db.child("posts").push(post_data, self.user_id_token)
+    
+        self.notify("Post", "Post created successfully.")
+        self.post_box.dismiss()
+
+    def get_posts(self):
+        all_posts = db.child("posts").get(self.user_id_token).val()
+        followed_posts = []
+        unfollowed_posts = []
+        for post_id, post in all_posts.items():
+            post["postId"] = post_id
+            post_owner_id = post["userId"]
+            post_owner = db.child("users").child(post_owner_id).get(self.user_id_token).val()
+            if current_user in post_owner.get("following", []):
+                followed_posts.append(post)
+            else:
+                unfollowed_posts.append(post)
+
+        post_frequencies = {}
+        for post in followed_posts:
+            post_key = post["postId"]
+            post_frequencies[post_key] = post_frequencies.get(post_key, 0) + 1
+            
+        sorted_followed_posts = sorted(followed_posts, key=lambda x: (post_frequencies.get(x["postId"], 0), x.get("timestamp", 0)), reverse=True)
+        posts = sorted_followed_posts + unfollowed_posts
+
+        for post in posts:
+            post_key = post["postId"]
+            self.increment_view_count(post_key)
+
+        return posts
+
+    def increment_view_count(self, post_key):
+        post_data = db.child("posts").child(post_key).get(self.user_id_token).val()
+    
+        if post_data:
+            viewed_by = post_data.get("viewed_by", [])
+        
+            if current_user not in viewed_by:
+                current_views = post_data.get("views", 0)
+                new_views = current_views + 1
+                viewed_by.append(current_user)
+                db.child("posts").child(post_key).update({
+                    "views": new_views,
+                "viewed_by": viewed_by
+                }, self.user_id_token)
+                print(f"View count updated for post {post_key}. Total views: {new_views}")
+            else:
+                print(f"User {current_user} has already viewed post {post_key}.")
+        else:
+            print(f"Post {post_key} does not exist.")
+            
 if __name__ == '__main__':
     MemerDevsApp().run()
