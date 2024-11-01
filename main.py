@@ -660,7 +660,7 @@ class PostRenderer(MDList):
             )
             header_box.add_widget(sender_label)
 
-        comment_card.add_widget(header_box)
+            comment_card.add_widget(header_box)
 
             message_text = MDLabel(
                 text=comment['text'],
