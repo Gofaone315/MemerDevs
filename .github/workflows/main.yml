@@ -61,7 +61,7 @@ jobs:
       - name: Install system dependencies
         run: |
           brew update
-          brew install git autoconf automake libtool
+          brew install autoconf automake libtool
           python3 -m pip install --upgrade Cython==0.29.33 buildozer pbxproj setuptools
         shell: bash
 
@@ -95,10 +95,7 @@ jobs:
 
   build-executables:
     name: Build Python Executables
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]  # Run on Linux, Windows, and macOS
+    runs-on: windows-latest
 
     steps:
       - name: Checkout code
@@ -115,10 +112,8 @@ jobs:
           pip install imageio pillow urllib3 requests kivy kivymd pyrebase4 plyer setuptools
 
       - name: Install zip
-        run: | 
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            choco install zip -y
-          fi
+        run: |
+          choco install zip -y
         shell: bash
 
       - name: Install Nuitka
@@ -126,13 +121,7 @@ jobs:
 
       - name: Build Executable
         run: |
-          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
-            python -m nuitka --standalone --static-libpython=yes --linux-icon=logo.ico --onefile --output-dir=dist main.py
-          elif [ "${{ matrix.os }}" == "windows-latest" ]; then
-            python -m nuitka --windows-company-name="Gofaone Tlalang" --windows-product-name="MemerDevs" --file-version=1.0.0.0 --product-version=1.0.0.0 --output-dir=dist main.py
-          elif [ "${{ matrix.os }}" == "macos-latest" ]; then
-            python -m nuitka --standalone --macos-app-icon=logo.ico --static-libpython=yes --onefile --output-dir=dist main.py
-          fi
+          python -m nuitka --windows-company-name="Gofaone Tlalang" --windows-product-name="MemerDevs" --file-version=1.0.0.0 --product-version=1.0.0.0 --standalone --onefile --output-dir=dist main.py
         shell: bash
 
       - name: Clean up intermediate build files
@@ -142,11 +131,11 @@ jobs:
 
       - name: Compress Executables (Max Compression)
         run: |
-          zip -9 -r executables-${{ matrix.os }}.zip dist/*
+          zip -9 -r executables-windows-latest.zip dist/*
         shell: bash
 
       - name: Upload OS-specific Executables as artifact
         uses: actions/upload-artifact@v3
         with:
-          name: executables-${{ matrix.os }}
-          path: executables-${{ matrix.os }}.zip
+          name: executables-windows-latest
+          path: executables-windows-latest.zip
