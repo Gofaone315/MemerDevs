@@ -27,9 +27,9 @@ jobs:
       - name: Download Mesa3D
         run: |
           curl -L -o mesa3d.zip https://github.com/pal1000/mesa-dist-win/releases/download/23.1.1/mesa3d-23.1.1-release-msvc.zip
-          if not exist mesa3d.zip (
-            echo "Mesa3D download failed." && exit 1
-          )
+          if (!(Test-Path "mesa3d.zip")) {
+            Write-Error "Mesa3D download failed." -ErrorAction Stop
+          }
 
       - name: Extract Mesa3D
         run: |
@@ -46,10 +46,19 @@ jobs:
         run: |
           python -m PyInstaller --name MemerDevs --onefile --noconfirm --icon=logo.ico main.py
 
-      - name: Archive and compress the build artifact
+      - name: Install zip for compression
+        run: |
+          choco install zip -y
+
+      - name: Compress the build artifact
+        run: |
+          cd dist
+          zip -9 -r MemerDevs.zip MemerDevs.exe
+
+      - name: Upload compressed artifact
         uses: actions/upload-artifact@v3
         with:
           name: MemerDevs
-          path: dist/MemerDevs.exe
+          path: dist/MemerDevs.zip
           retention-days: 7
           if-no-files-found: error
