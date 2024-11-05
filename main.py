@@ -1,3 +1,6 @@
+from kivy import Config
+Config.set('graphics', 'multisamples', '0')
+Config.set('graphics', 'gl_backend', 'angle_sdl2')
 from kivy.lang import Builder
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivymd.app import MDApp
