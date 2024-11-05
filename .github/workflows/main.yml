@@ -24,10 +24,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install kivy kivymd plyer urllib3 requests pyrebase4 pyinstaller
 
-      - name: Install Mesa3D
+      - name: Download Mesa3D
         run: |
           curl -L -o mesa3d.zip https://github.com/pal1000/mesa-dist-win/releases/download/23.1.1/mesa3d-23.1.1-release-msvc.zip
-          tar -xf mesa3d.zip -C mesa3d --strip-components=1
+          if not exist mesa3d.zip (
+            echo "Mesa3D download failed." && exit 1
+          )
+
+      - name: Extract Mesa3D
+        run: |
+          mkdir mesa3d
+          powershell -Command "Expand-Archive -Path mesa3d.zip -DestinationPath mesa3d"
 
       - name: Configure Mesa3D for OpenGL
         run: |
@@ -44,5 +51,5 @@ jobs:
         with:
           name: MemerDevs
           path: dist/MemerDevs.exe
-          retention-days: 7  # Optional: retain artifact for 7 days
+          retention-days: 7
           if-no-files-found: error
