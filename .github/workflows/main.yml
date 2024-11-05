@@ -39,7 +39,7 @@ jobs:
 
       - name: Build Executable
         run: |
-          python -m PyInstaller --name MemerDevs --onefile --standalone --noconfirm --icon=logo.ico main.py
+          python -m PyInstaller --name MemerDevs --onefile --noconfirm --icon=logo.ico main.py
         shell: bash
 
       - name: Clean up intermediate build files
