@@ -1,4 +1,4 @@
-name: 'Kivy App to APK, IPA, and Executables'
+name: 'Kivy App to Executables'
 
 # Define the event that triggers the workflow
 on:
