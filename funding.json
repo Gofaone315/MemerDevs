@@ -9,7 +9,7 @@
     "description": "I am the creator of MemerDevs, a platform designed for developers, programmers, and tech enthusiasts to share their experiences through memes. My mission is to bring laughter and learning together in the tech community.",
     "webpageUrl": {
       "url": "https://memerdevs.web.app",
-      "wellKnown": "https://memerdevs.web.app/.well-known/funding-manifest-urls"
+      "wellKnown": "https://memerdevs.web.app/*/.well-known/funding-manifest-urls"
     }
   },
   "projects": [
