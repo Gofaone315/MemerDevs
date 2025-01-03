@@ -23,7 +23,7 @@
       },
       "repositoryUrl": {
         "url": "https://github.com/Gofaone315/MemerDevs",
-        "wellKnown": "https://github.com/Gofaone315/MemerDevs/*/.well-known/funding-manifest-urls"
+        "wellKnown": "https://github.com/Gofaone315/MemerDevs/blob/main/.well-known/funding-manifest-urls"
       },
       "licenses": [
         "spdx:MIT"
