@@ -18,7 +18,8 @@
       "name": "MemerDevs",
       "description": "MemerDevs is a platform designed for developers, programmers, and tech enthusiasts to share their experiences in a fun and engaging way—through memes. Whether you're debugging, coding, or just enjoying the developer community, MemerDevs brings laughter and learning together.",
       "webpageUrl": {
-        "url": "https://memerdevs.web.app"
+        "url": "https://memerdevs.web.app",
+        "wellKnown": "https://memerdevs.web.app/*/.well-known/funding-manifest-urls"
       },
       "repositoryUrl": {
         "url": "https://github.com/Gofaone315/MemerDevs",
