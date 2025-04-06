@@ -17,14 +17,14 @@ Welcome to the **MemerDevs** GitHub Page! This is your comprehensive guide to ev
 **MemerDevs** is a website designed for developers, programmers, and tech enthusiasts to share their experiences in a fun and engaging way—through memes. Whether you're debugging, coding, or just enjoying the developer community, MemerDevs brings laughter and learning together.  
 
 ### Website  
-Visit MemerDevs: [https://memerdevs.web.app](https://memerdevs.web.app)  
+Visit MemerDevs: [https://memerdevs.com](https://memerdevs.com)  
 
 ---
 
 ## Getting Started  
 ### Access the Website  
 1. Open your web browser.  
-2. Navigate to [https://memerdevs.web.app](https://memerdevs.web.app).  
+2. Navigate to [https://memerdevs.com](https://memerdevs.com).  
 3. Create an account or log in to start sharing memes and interacting with the community.  
 
 ---
