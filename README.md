@@ -44,7 +44,7 @@ We welcome contributions from the community!
 ### How to Contribute  
 1. Fork the repository:  
 ```bash
-git clone https://github.com/Gofaone315/MemerDevs.git 
+git clone https://github.com/Gofaone315/MemerDevs
 ```
 
 ```bash
@@ -89,7 +89,7 @@ Include detailed commit messages and pull request descriptions.
 
 ## Community and Support
 
-Explore our website: https://memerdevs.web.app
+Explore our website: [https://memerdevs.com](https://memerdevs.com)
 
 Support the project: [MemerDevs Patreon](https://patreon.com/MemerDevs)
 
